@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.pyc
+venv/
+.env
+bugtrack.db
+
+# Android / Gradle
+.gradle/
+build/
+*/build/
+local.properties
+.idea/
+*.iml
+
+# Node / React later
+node_modules/
+dist/
+
+# OS
+.DS_Store
+Thumbs.db
