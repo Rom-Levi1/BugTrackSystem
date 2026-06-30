@@ -1,12 +1,15 @@
 from fastapi import FastAPI, Depends, HTTPException, Header
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, EmailStr, ConfigDict
 from sqlalchemy.orm import Session
 from typing import Optional, List
 from datetime import datetime, timezone
 import uuid
-
 from database import engine, SessionLocal
 import models
+from jose import jwt, JWTError
+from passlib.context import CryptContext
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+import secrets
 
 
 # Create the database tables if they do not already exist.
@@ -21,6 +24,49 @@ app = FastAPI(
     version="1.0.0"
 )
 
+# Password hashing configuration.
+# We never store plain text passwords in the database.
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+# JWT configuration for dashboard login.
+# In production this should be stored in an environment variable.
+SECRET_KEY = "dev_secret_key_change_later"
+ALGORITHM = "HS256"
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
+
+class UserRegister(BaseModel):
+    # Request body for creating a new dashboard user.
+    email: EmailStr
+    password: str
+
+
+class UserLogin(BaseModel):
+    # Request body for dashboard login.
+    email: EmailStr
+    password: str
+
+
+class TokenResponse(BaseModel):
+    # Response returned after successful login.
+    access_token: str
+    token_type: str = "bearer"
+
+
+class ProjectCreate(BaseModel):
+    # Request body for creating a new SDK project/app.
+    name: str
+
+
+class ProjectResponse(BaseModel):
+    # Response returned to the dashboard when listing projects.
+    id: str
+    name: str
+    api_key: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
 
 class ReportCreate(BaseModel):
     # This class defines the JSON structure that the Android SDK sends to the backend.
@@ -109,15 +155,65 @@ def get_db():
     finally:
         db.close()
 
-def verify_api_key(x_api_key: str = Header(None)):
-    # Simple API key check for the MVP.
-    # for now hardcoded.
-    valid_api_key = "test_api_key_123"
+def hash_password(password: str):
+    # Hashes the user's password before saving it.
+    return pwd_context.hash(password)
 
-    if x_api_key != valid_api_key:
-        raise HTTPException(status_code=401, detail="Invalid or missing API key")
 
-    return x_api_key
+def verify_password(plain_password: str, password_hash: str):
+    # Checks if the provided password matches the saved hash.
+    return pwd_context.verify(plain_password, password_hash)
+
+
+def create_access_token(data: dict):
+    # Creates a JWT token for dashboard authentication.
+    return jwt.encode(data, SECRET_KEY, algorithm=ALGORITHM)
+
+
+def get_current_user(
+    token: str = Depends(oauth2_scheme),
+    db: Session = Depends(get_db)
+):
+    # Reads the JWT token and returns the logged-in user.
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id = payload.get("sub")
+
+        if user_id is None:
+            raise HTTPException(status_code=401, detail="Invalid token")
+
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    user = db.query(models.User).filter(
+        models.User.id == user_id
+    ).first()
+
+    if user is None:
+        raise HTTPException(status_code=401, detail="User not found")
+
+    return user
+
+def verify_project_api_key(
+    report: ReportCreate,
+    x_api_key: str = Header(None),
+    db: Session = Depends(get_db)
+):
+    # Validates that the Android SDK is using the correct API key for the given project.
+    # This replaces the old hardcoded API key.
+
+    if x_api_key is None:
+        raise HTTPException(status_code=401, detail="Missing API key")
+
+    project = db.query(models.Project).filter(
+        models.Project.id == report.project_id,
+        models.Project.api_key == x_api_key
+    ).first()
+
+    if project is None:
+        raise HTTPException(status_code=401, detail="Invalid project id or API key")
+
+    return project
 
 def normalize_status(status: str):
     # Keeps status values consistent in the database.
@@ -170,7 +266,7 @@ def home():
 def create_report(
     report: ReportCreate,
     db: Session = Depends(get_db),
-    api_key: str = Depends(verify_api_key)
+    project: models.Project = Depends(verify_project_api_key)
 ):
     # This endpoint receives crash/bug reports from the Android SDK.
 
@@ -382,3 +478,102 @@ def delete_report(
         "message": "Report deleted successfully",
         "deleted_report_id": report_id
     }
+
+@app.post("/api/auth/register", response_model=TokenResponse)
+def register_user(
+    user_data: UserRegister,
+    db: Session = Depends(get_db)
+):
+    # Creates a new dashboard user.
+
+    existing_user = db.query(models.User).filter(
+        models.User.email == user_data.email
+    ).first()
+
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Email already registered")
+
+    user_id = "user_" + str(uuid.uuid4())[:8]
+
+    new_user = models.User(
+        id=user_id,
+        email=user_data.email,
+        password_hash=hash_password(user_data.password)
+    )
+
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+
+    token = create_access_token({"sub": new_user.id})
+
+    return {
+        "access_token": token,
+        "token_type": "bearer"
+    }
+
+
+@app.post("/api/auth/login", response_model=TokenResponse)
+def login_user(
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: Session = Depends(get_db)
+):
+    # Logs in an existing dashboard user.
+    # OAuth2PasswordRequestForm is used so Swagger's Authorize button works.
+    # In this project, username is treated as the user's email.
+
+    user = db.query(models.User).filter(
+        models.User.email == form_data.username
+    ).first()
+
+    if user is None:
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+
+    if not verify_password(form_data.password, user.password_hash):
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+
+    token = create_access_token({"sub": user.id})
+
+    return {
+        "access_token": token,
+        "token_type": "bearer"
+    }
+
+@app.post("/api/projects", response_model=ProjectResponse)
+def create_project(
+    project_data: ProjectCreate,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    # Creates a new project/app for the logged-in dashboard user.
+    # The generated API key will be used by the Android SDK.
+
+    project_id = "project_" + str(uuid.uuid4())[:8]
+    api_key = "bt_" + secrets.token_urlsafe(32)
+
+    new_project = models.Project(
+        id=project_id,
+        user_id=current_user.id,
+        name=project_data.name,
+        api_key=api_key
+    )
+
+    db.add(new_project)
+    db.commit()
+    db.refresh(new_project)
+
+    return new_project
+
+
+@app.get("/api/projects", response_model=List[ProjectResponse])
+def get_projects(
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    # Returns all projects that belong to the logged-in dashboard user.
+
+    projects = db.query(models.Project).filter(
+        models.Project.user_id == current_user.id
+    ).all()
+
+    return projects

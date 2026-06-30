@@ -1,7 +1,29 @@
-from sqlalchemy import Column, String, Integer, DateTime, Text
+from sqlalchemy import Column, String, Integer, DateTime, Text, ForeignKey
 from datetime import datetime, timezone
 from database import Base
 
+
+class User(Base):
+    # Dashboard user account.
+    # A user can own multiple projects/apps.
+    __tablename__ = "users"
+
+    id = Column(String, primary_key=True, index=True)
+    email = Column(String, unique=True, nullable=False, index=True)
+    password_hash = Column(String, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+
+class Project(Base):
+    # Represents one app/project that uses the BugTrack SDK.
+    # Each project has its own API key.
+    __tablename__ = "projects"
+
+    id = Column(String, primary_key=True, index=True)
+    user_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
+    name = Column(String, nullable=False)
+    api_key = Column(String, unique=True, nullable=False, index=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 class Report(Base):
     # This class represents the reports table in the SQLite database.
