@@ -10,6 +10,7 @@ from jose import jwt, JWTError
 from passlib.context import CryptContext
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 import secrets
+from fastapi.middleware.cors import CORSMiddleware
 
 
 # Create the database tables if they do not already exist.
@@ -22,6 +23,17 @@ app = FastAPI(
     title="BugTrack API",
     description="Backend API for crash reports, bug reports, and analytics events",
     version="1.0.0"
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # Password hashing configuration.
