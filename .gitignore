@@ -4,6 +4,7 @@ __pycache__/
 venv/
 .env
 bugtrack.db
+bugtrack-backend/bugtrack.db
 
 # Android / Gradle
 .gradle/
@@ -13,9 +14,10 @@ local.properties
 .idea/
 *.iml
 
-# Node / React later
+# React / Node
 node_modules/
-dist/
+bugtrack-dashboard/node_modules/
+bugtrack-dashboard/dist/
 
 # OS
 .DS_Store
