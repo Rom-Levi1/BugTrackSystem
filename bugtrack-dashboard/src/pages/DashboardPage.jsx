@@ -15,6 +15,7 @@ import Toast from "../components/Toast";
 import {
   createProject,
   deleteProject,
+  deleteReport,
   getProjects,
   getReportById,
   getReports,
@@ -41,6 +42,8 @@ function DashboardPage({ onLogout }) {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deletingProject, setDeletingProject] = useState(false);
+  const [reportPendingDelete, setReportPendingDelete] = useState(null);
+  const [deletingReport, setDeletingReport] = useState(false);
   const [loadingProject, setLoadingProject] = useState(false);
   const [loadingReports, setLoadingReports] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(null);
@@ -211,6 +214,45 @@ function DashboardPage({ onLogout }) {
     }
   }
 
+  function handleDeleteReportClick(report) {
+    setReportPendingDelete(report);
+  }
+
+  async function handleConfirmDeleteReport() {
+    if (!reportPendingDelete) {
+      return;
+    }
+
+    try {
+      setDeletingReport(true);
+      setError("");
+
+      await deleteReport(reportPendingDelete.id);
+
+      setReports((currentReports) =>
+        currentReports.filter((report) => report.id !== reportPendingDelete.id)
+      );
+
+      if (selectedReport?.id === reportPendingDelete.id) {
+        setSelectedReport(null);
+      }
+
+      if (selectedProject) {
+        const summaryData = await getSummary(selectedProject.id);
+        setSummary(summaryData);
+        setLastUpdated(new Date());
+      }
+
+      showToast("Report deleted");
+      setReportPendingDelete(null);
+    } catch (err) {
+      setError(err.message);
+      showToast(err.message, "error");
+    } finally {
+      setDeletingReport(false);
+    }
+  }
+
   function handleFiltersChange(nextFilters) {
     setFilters(nextFilters);
 
@@ -376,6 +418,7 @@ function DashboardPage({ onLogout }) {
                 report={selectedReport}
                 onClose={() => setSelectedReport(null)}
                 onUpdateStatus={handleUpdateStatus}
+                onDeleteClick={handleDeleteReportClick}
               />
             </section>
           </>
@@ -398,6 +441,17 @@ function DashboardPage({ onLogout }) {
           loading={deletingProject}
           onConfirm={handleConfirmDeleteProject}
           onCancel={() => setConfirmingDelete(false)}
+        />
+      )}
+
+      {reportPendingDelete && (
+        <ConfirmDialog
+          title="Delete this report?"
+          message="This will permanently remove the report and its stack trace. This action cannot be undone."
+          confirmLabel="Delete Report"
+          loading={deletingReport}
+          onConfirm={handleConfirmDeleteReport}
+          onCancel={() => setReportPendingDelete(null)}
         />
       )}
 

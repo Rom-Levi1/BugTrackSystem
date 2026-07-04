@@ -1,4 +1,4 @@
-import { Smartphone, User, X } from "lucide-react";
+import { Smartphone, Trash2, User, X } from "lucide-react";
 import SeverityBadge from "./SeverityBadge";
 import StatusBadge from "./StatusBadge";
 
@@ -10,7 +10,7 @@ function formatDate(value) {
   return new Date(value).toLocaleString();
 }
 
-function ReportDetails({ report, onClose, onUpdateStatus }) {
+function ReportDetails({ report, onClose, onUpdateStatus, onDeleteClick }) {
   if (!report) {
     return (
       <div className="card empty-card details-empty">
@@ -28,9 +28,19 @@ function ReportDetails({ report, onClose, onUpdateStatus }) {
           <h2>{report.title || report.message}</h2>
         </div>
 
-        <button className="icon-button" onClick={onClose} aria-label="Close report details">
-          <X size={16} />
-        </button>
+        <div className="details-header-actions">
+          <button
+            className="icon-button icon-button-danger"
+            onClick={() => onDeleteClick(report)}
+            aria-label="Delete report"
+          >
+            <Trash2 size={16} />
+          </button>
+
+          <button className="icon-button" onClick={onClose} aria-label="Close report details">
+            <X size={16} />
+          </button>
+        </div>
       </div>
 
       <div className="details-badges">

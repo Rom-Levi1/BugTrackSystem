@@ -272,6 +272,11 @@ a:focus-visible {
   color: white;
 }
 
+.icon-button-danger:hover {
+  border-color: var(--danger);
+  color: #fecaca;
+}
+
 .icon-button svg,
 .secondary-button svg,
 .primary-button svg,
@@ -597,7 +602,7 @@ code {
 
 .summary-grid {
   display: grid;
-  grid-template-columns: repeat(6, minmax(145px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: 16px;
   margin-bottom: 20px;
 }
@@ -623,6 +628,10 @@ code {
   margin: 0;
   color: var(--text-muted);
   font-size: 13px;
+  line-height: 1.4;
+  min-height: 2.8em;
+  display: flex;
+  align-items: flex-end;
 }
 
 .summary-card h3 {
@@ -896,6 +905,12 @@ code {
   line-height: 1.2;
 }
 
+.details-header-actions {
+  display: flex;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
 .details-badges {
   display: flex;
   flex-wrap: wrap;
@@ -1113,10 +1128,6 @@ code {
 /* ---------- Responsive ---------- */
 
 @media (max-width: 1350px) {
-  .summary-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
   .breakdown-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
