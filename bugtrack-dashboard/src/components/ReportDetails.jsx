@@ -28,7 +28,7 @@ function ReportDetails({ report, onClose, onUpdateStatus }) {
           <h2>{report.title || report.message}</h2>
         </div>
 
-        <button className="icon-button" onClick={onClose}>
+        <button className="icon-button" onClick={onClose} aria-label="Close report details">
           <X size={16} />
         </button>
       </div>

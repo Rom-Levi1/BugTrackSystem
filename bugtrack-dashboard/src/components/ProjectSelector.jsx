@@ -1,16 +1,20 @@
-import { Plus } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 
 function ProjectSelector({
   projects,
   selectedProject,
   onSelectProject,
   onCreateProjectClick,
+  onDeleteProjectClick,
 }) {
   return (
     <div className="project-selector card">
       <div>
-        <p className="section-label">Current Project</p>
+        <p className="section-label">Project Manager</p>
         <h2>Project Workspace</h2>
+        <p className="muted-text">
+          Create, select, and manage Android apps connected to BugTrack.
+        </p>
       </div>
 
       <div className="project-selector-actions">
@@ -35,6 +39,15 @@ function ProjectSelector({
         <button className="primary-button small" onClick={onCreateProjectClick}>
           <Plus size={16} />
           New Project
+        </button>
+
+        <button
+          className="danger-button small"
+          onClick={onDeleteProjectClick}
+          disabled={!selectedProject}
+        >
+          <Trash2 size={16} />
+          Delete
         </button>
       </div>
     </div>

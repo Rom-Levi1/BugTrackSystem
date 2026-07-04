@@ -147,6 +147,17 @@ export async function updateReportStatus(reportId, status) {
   return handleResponse(response);
 }
 
+export async function deleteProject(projectId) {
+  const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}`, {
+    method: "DELETE",
+    headers: {
+      ...getAuthHeaders(),
+    },
+  });
+
+  return handleResponse(response);
+}
+
 export function saveToken(token) {
   localStorage.setItem("bugtrack_token", token);
 }

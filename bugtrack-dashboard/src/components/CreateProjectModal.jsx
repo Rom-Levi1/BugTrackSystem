@@ -1,8 +1,19 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { X } from "lucide-react";
 
 function CreateProjectModal({ onClose, onCreate, loading }) {
   const [name, setName] = useState("");
+
+  useEffect(() => {
+    function handleKeyDown(event) {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
 
   function handleSubmit(event) {
     event.preventDefault();
@@ -23,7 +34,7 @@ function CreateProjectModal({ onClose, onCreate, loading }) {
             <h2>Create Android App Project</h2>
           </div>
 
-          <button className="icon-button" onClick={onClose}>
+          <button className="icon-button" onClick={onClose} aria-label="Close dialog">
             <X size={18} />
           </button>
         </div>

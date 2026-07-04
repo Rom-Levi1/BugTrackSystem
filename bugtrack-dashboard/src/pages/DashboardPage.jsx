@@ -1,16 +1,20 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { RefreshCcw } from "lucide-react";
 import Sidebar from "../components/Sidebar";
 import ProjectSelector from "../components/ProjectSelector";
 import CreateProjectModal from "../components/CreateProjectModal";
+import ConfirmDialog from "../components/ConfirmDialog";
 import ApiKeyBox from "../components/ApiKeyBox";
 import IntegrationSnippet from "../components/IntegrationSnippet";
 import SummaryCards from "../components/SummaryCards";
+import SummaryBreakdown from "../components/SummaryBreakdown";
 import FiltersBar from "../components/FiltersBar";
 import ReportsTable from "../components/ReportsTable";
 import ReportDetails from "../components/ReportDetails";
+import Toast from "../components/Toast";
 import {
   createProject,
+  deleteProject,
   getProjects,
   getReportById,
   getReports,
@@ -30,13 +34,37 @@ function DashboardPage({ onLogout }) {
     status: "",
     severity: "",
     type: "",
+    search: "",
+    sortBy: "newest",
   });
 
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deletingProject, setDeletingProject] = useState(false);
   const [loadingProject, setLoadingProject] = useState(false);
   const [loadingReports, setLoadingReports] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(null);
   const [error, setError] = useState("");
+  const [toast, setToast] = useState(null);
+
+  const toastTimeoutRef = useRef(null);
+
+  function showToast(message, type = "success") {
+    if (toastTimeoutRef.current) {
+      clearTimeout(toastTimeoutRef.current);
+    }
+
+    setToast({ message, type });
+    toastTimeoutRef.current = setTimeout(() => setToast(null), 3500);
+  }
+
+  useEffect(() => {
+    return () => {
+      if (toastTimeoutRef.current) {
+        clearTimeout(toastTimeoutRef.current);
+      }
+    };
+  }, []);
 
   async function loadProjects() {
     try {
@@ -98,6 +126,7 @@ function DashboardPage({ onLogout }) {
       setProjects((currentProjects) => [...currentProjects, newProject]);
       setSelectedProject(newProject);
       setShowCreateModal(false);
+      showToast(`Project "${newProject.name}" created`);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -112,6 +141,46 @@ function DashboardPage({ onLogout }) {
       setSelectedReport(fullReport);
     } catch (err) {
       setError(err.message);
+    }
+  }
+
+  function handleDeleteProjectClick() {
+    if (!selectedProject) {
+      return;
+    }
+
+    setConfirmingDelete(true);
+  }
+
+  async function handleConfirmDeleteProject() {
+    if (!selectedProject) {
+      return;
+    }
+
+    try {
+      setDeletingProject(true);
+      setError("");
+
+      const deletedProjectName = selectedProject.name;
+
+      await deleteProject(selectedProject.id);
+
+      const remainingProjects = projects.filter(
+        (project) => project.id !== selectedProject.id
+      );
+
+      setProjects(remainingProjects);
+      setSelectedProject(remainingProjects[0] || null);
+      setSummary(null);
+      setReports([]);
+      setSelectedReport(null);
+      setConfirmingDelete(false);
+      showToast(`Project "${deletedProjectName}" deleted`);
+    } catch (err) {
+      setError(err.message);
+      setConfirmingDelete(false);
+    } finally {
+      setDeletingProject(false);
     }
   }
 
@@ -134,8 +203,11 @@ function DashboardPage({ onLogout }) {
         setSummary(summaryData);
         setLastUpdated(new Date());
       }
+
+      showToast(`Report marked as ${status}`);
     } catch (err) {
       setError(err.message);
+      showToast(err.message, "error");
     }
   }
 
@@ -163,12 +235,69 @@ function DashboardPage({ onLogout }) {
     }
   }, [selectedProject]);
 
+
+  const visibleReports = useMemo(() => {
+  let result = [...reports];
+
+  const searchText = filters.search.trim().toLowerCase();
+
+  if (searchText) {
+    result = result.filter((report) => {
+      const combinedText = [
+        report.title,
+        report.message,
+        report.description,
+        report.screen_name,
+        report.device_model,
+        report.user_id,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+
+      return combinedText.includes(searchText);
+    });
+  }
+
+  if (filters.sortBy === "newest") {
+    result.sort((a, b) => {
+      const dateA = new Date(a.last_seen_at || a.created_at).getTime();
+      const dateB = new Date(b.last_seen_at || b.created_at).getTime();
+      return dateB - dateA;
+    });
+  }
+
+  if (filters.sortBy === "oldest") {
+    result.sort((a, b) => {
+      const dateA = new Date(a.last_seen_at || a.created_at).getTime();
+      const dateB = new Date(b.last_seen_at || b.created_at).getTime();
+      return dateA - dateB;
+    });
+  }
+
+  if (filters.sortBy === "occurrences") {
+    result.sort((a, b) => {
+      return (b.occurrence_count || 1) - (a.occurrence_count || 1);
+    });
+  }
+
+  return result;
+}, [reports, filters.search, filters.sortBy]);
+
+
   return (
     <div className="dashboard-shell">
-      <Sidebar onLogout={onLogout} />
+      <Sidebar
+        onLogout={onLogout}
+        onDashboardClick={() => {
+            document.getElementById("dashboard-top")?.scrollIntoView({
+            behavior: "smooth",
+            });
+        }}
+        />
 
       <main className="dashboard-main">
-        <header className="dashboard-header dashboard-header-row">
+        <header className="dashboard-header dashboard-header-row" id="dashboard-top">
           <div>
             <p className="section-label">Overview</p>
             <h1>BugTrack Dashboard</h1>
@@ -195,12 +324,15 @@ function DashboardPage({ onLogout }) {
 
         {error && <div className="error-box dashboard-error">{error}</div>}
 
+      <section>
         <ProjectSelector
-          projects={projects}
-          selectedProject={selectedProject}
-          onSelectProject={setSelectedProject}
-          onCreateProjectClick={() => setShowCreateModal(true)}
+            projects={projects}
+            selectedProject={selectedProject}
+            onSelectProject={setSelectedProject}
+            onCreateProjectClick={() => setShowCreateModal(true)}
+            onDeleteProjectClick={handleDeleteProjectClick}
         />
+      </section>
 
         {projects.length === 0 ? (
           <section className="card onboarding-card">
@@ -228,17 +360,18 @@ function DashboardPage({ onLogout }) {
 
             <SummaryCards summary={summary} />
 
+            <SummaryBreakdown summary={summary} />
+
             <FiltersBar filters={filters} onChangeFilters={handleFiltersChange} />
 
             {loadingReports && <p className="muted-text">Loading reports...</p>}
 
             <section className="reports-layout">
               <ReportsTable
-                reports={reports}
+                reports={visibleReports}
                 selectedReport={selectedReport}
                 onSelectReport={handleSelectReport}
               />
-
               <ReportDetails
                 report={selectedReport}
                 onClose={() => setSelectedReport(null)}
@@ -256,6 +389,19 @@ function DashboardPage({ onLogout }) {
           onCreate={handleCreateProject}
         />
       )}
+
+      {confirmingDelete && selectedProject && (
+        <ConfirmDialog
+          title={`Delete "${selectedProject.name}"?`}
+          message="This will also delete all reports for this project. This action cannot be undone."
+          confirmLabel="Delete Project"
+          loading={deletingProject}
+          onConfirm={handleConfirmDeleteProject}
+          onCancel={() => setConfirmingDelete(false)}
+        />
+      )}
+
+      <Toast toast={toast} />
     </div>
   );
 }

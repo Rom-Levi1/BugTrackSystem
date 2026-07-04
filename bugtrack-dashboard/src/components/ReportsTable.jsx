@@ -62,7 +62,7 @@ function ReportsTable({ reports, selectedReport, onSelectReport }) {
 
                 <td>{report.screen_name || "Unknown"}</td>
 
-                <td>{report.occurrence_count || 1}</td>
+                <td className="numeric-cell">{report.occurrence_count || 1}</td>
 
                 <td>{formatDate(report.last_seen_at || report.created_at)}</td>
 
@@ -71,6 +71,7 @@ function ReportsTable({ reports, selectedReport, onSelectReport }) {
                     className="icon-button"
                     onClick={() => onSelectReport(report)}
                     title="View report details"
+                    aria-label={`View details for ${report.title || report.message}`}
                   >
                     <Eye size={16} />
                   </button>

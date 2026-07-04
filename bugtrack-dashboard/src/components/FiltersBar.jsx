@@ -1,4 +1,4 @@
-import { RotateCcw } from "lucide-react";
+import { RotateCcw, Search } from "lucide-react";
 
 function FiltersBar({ filters, onChangeFilters }) {
   function updateFilter(name, value) {
@@ -13,6 +13,8 @@ function FiltersBar({ filters, onChangeFilters }) {
       status: "",
       severity: "",
       type: "",
+      search: "",
+      sortBy: "newest",
     });
   }
 
@@ -24,6 +26,15 @@ function FiltersBar({ filters, onChangeFilters }) {
       </div>
 
       <div className="filters-controls">
+        <div className="search-input">
+          <Search size={16} />
+          <input
+            value={filters.search}
+            onChange={(event) => updateFilter("search", event.target.value)}
+            placeholder="Search reports..."
+          />
+        </div>
+
         <select
           value={filters.status}
           onChange={(event) => updateFilter("status", event.target.value)}
@@ -51,6 +62,15 @@ function FiltersBar({ filters, onChangeFilters }) {
           <option value="">All types</option>
           <option value="bug">Bug</option>
           <option value="crash">Crash</option>
+        </select>
+
+        <select
+          value={filters.sortBy}
+          onChange={(event) => updateFilter("sortBy", event.target.value)}
+        >
+          <option value="newest">Newest first</option>
+          <option value="oldest">Oldest first</option>
+          <option value="occurrences">Most occurrences</option>
         </select>
 
         <button className="secondary-button small" onClick={resetFilters}>

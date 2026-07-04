@@ -40,6 +40,7 @@ function ApiKeyBox({ project }) {
           className="icon-button"
           onClick={() => copyText(project.id, "project_id")}
           title="Copy project ID"
+          aria-label="Copy project ID"
         >
           {copiedField === "project_id" ? <Check size={16} /> : <Copy size={16} />}
         </button>
@@ -52,6 +53,7 @@ function ApiKeyBox({ project }) {
           className="icon-button"
           onClick={() => copyText(project.api_key, "api_key")}
           title="Copy API key"
+          aria-label="Copy API key"
         >
           {copiedField === "api_key" ? <Check size={16} /> : <Copy size={16} />}
         </button>

@@ -154,6 +154,8 @@ class SummaryResponse(BaseModel):
     open_reports: int
     fixed_reports: int
     ignored_reports: int
+    low_severity_reports: int
+    medium_severity_reports: int
     high_severity_reports: int
     crash_reports: int
     bug_reports: int
@@ -445,6 +447,14 @@ def get_summary(
         models.Report.status == "Ignored"
     ).count()
 
+    low_severity_reports = query.filter(
+        models.Report.severity == "Low"
+    ).count()
+
+    medium_severity_reports = query.filter(
+        models.Report.severity == "Medium"
+    ).count()
+
     high_severity_reports = query.filter(
         models.Report.severity == "High"
     ).count()
@@ -462,6 +472,8 @@ def get_summary(
         "open_reports": open_reports,
         "fixed_reports": fixed_reports,
         "ignored_reports": ignored_reports,
+        "low_severity_reports": low_severity_reports,
+        "medium_severity_reports": medium_severity_reports,
         "high_severity_reports": high_severity_reports,
         "crash_reports": crash_reports,
         "bug_reports": bug_reports
@@ -589,3 +601,29 @@ def get_projects(
     ).all()
 
     return projects
+
+@app.delete("/api/projects/{project_id}")
+def delete_project(
+    project_id: str,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    project = db.query(models.Project).filter(
+        models.Project.id == project_id,
+        models.Project.user_id == current_user.id
+    ).first()
+
+    if project is None:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    db.query(models.Report).filter(
+        models.Report.project_id == project_id
+    ).delete()
+
+    db.delete(project)
+    db.commit()
+
+    return {
+        "message": "Project deleted successfully",
+        "project_id": project_id
+    }
